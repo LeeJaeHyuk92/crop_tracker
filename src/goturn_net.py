@@ -1,5 +1,20 @@
 import tensorflow as tf
 import numpy as np
+from helper.config import POLICY
+from logger.logger import setup_logger
+
+logger = setup_logger(logfile=None)
+
+def expit_tensor(x):
+	return 1. / (1. + tf.exp(-x))
+
+# https://github.com/tensorflow/tensorflow/issues/4079
+def LeakyReLU(x, alpha=0.1, name="lrelu"):
+    with tf.variable_scope(name):
+        f1 = 0.5 * (1.0 + alpha)
+        f2 = 0.5 * (1.0 - alpha)
+        return f1 * x + f2 * abs(x)
+
 class TRACKNET: 
     def __init__(self, batch_size, train = True):
         self.parameters = {}
@@ -7,11 +22,20 @@ class TRACKNET:
         self.target = tf.placeholder(tf.float32, [batch_size, 227, 227, 3])
         self.image = tf.placeholder(tf.float32, [batch_size, 227, 227, 3])
         self.bbox = tf.placeholder(tf.float32, [batch_size, 4])
+        self.confs = tf.placeholder(tf.float32, [batch_size, POLICY['side'] * POLICY['side'], POLICY['num']])
+        self.coord = tf.placeholder(tf.float32, [batch_size, POLICY['side'] * POLICY['side'], POLICY['num'], 4])
+        self.upleft = tf.placeholder(tf.float32, [batch_size, POLICY['side'] * POLICY['side'], POLICY['num'], 2])
+        self.botright = tf.placeholder(tf.float32, [batch_size, POLICY['side'] * POLICY['side'], POLICY['num'], 2])
+        self.areas = tf.placeholder(tf.float32, [batch_size, POLICY['side'] * POLICY['side'], POLICY['num']])
+        self.outdim = POLICY['side'] * POLICY['side'] * POLICY['num'] * 5
         self.train = train
         self.wd = 0.0005
     def build(self):
         ########### for target ###########
         # [filter_height, filter_width, in_channels, out_channels]
+        tf.summary.image("image", self.image, max_outputs=2)
+        tf.summary.image("target", self.target, max_outputs=2)
+
         self.target_conv1 = self._conv_relu_layer(bottom = self.target, filter_size = [11, 11, 3, 96],
                                                     strides = [1,4,4,1], name = "target_conv_1")
         
@@ -119,10 +143,14 @@ class TRACKNET:
         if (self.train):
             self.fc3 = tf.nn.dropout(self.fc3, 0.5)
 
-        self.fc4 = self._fc_layers(self.fc3, dim = 4, name = "fc4")
+        self.fc4 = self._fc_layers(self.fc3, dim = self.outdim, name = "fc4")
+        self.net_grid = tf.reshape(self.fc4, shape=[-1, POLICY['side'], POLICY['side'], (4 + 1)])
+        tf.summary.image("objectness", self.net_grid[:, :, :, 4:], max_outputs=2)
 
         self.print_shapes()
-        self.loss = self._loss_layer(self.fc4, self.bbox ,name = "loss")
+        self.loss = self.loss_grid(self.fc4, POLICY, name="loss")
+        # self.loss = self._loss_layer(self.fc4, self.bbox ,name = "loss")
+
         l2_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES), name='l2_weight_loss')
         self.loss_wdecay = self.loss + l2_loss
 
@@ -131,6 +159,175 @@ class TRACKNET:
         diff_flat = tf.abs(tf.reshape(diff,[-1]))
         loss = tf.reduce_sum(diff_flat, name = name)
         return loss
+
+    def loss_grid(self, net_out, training_schedule, name=None):
+        """
+        from YOLOv2, link: https://github.com/thtrieu/darkflow
+        """
+        # meta
+        m = training_schedule
+        sconf = float(m['object_scale'])
+        snoob = float(m['noobject_scale'])
+        scoor = float(m['coord_scale'])
+        H, W = m['side'], m['side']
+        B = m['num']
+        HW = H * W  # number of grid cells
+        anchors = m['anchors']
+
+
+        # Extract the coordinate prediction from net.out
+        net_out_reshape = tf.reshape(net_out, [-1, H, W, B, (4 + 1)])
+        coords = net_out_reshape[:, :, :, :, :4]
+        coords = tf.reshape(coords, [-1, H * W, B, 4])
+        adjusted_coords_xy = expit_tensor(coords[:, :, :, 0:2])
+        adjusted_coords_wh = tf.sqrt(
+                 tf.exp(coords[:, :, :, 2:4]) * tf.reshape(anchors, [1, 1, B, 2]) / np.reshape([W, H], [1, 1, 1, 2]) + 1e-8)
+
+
+        coords = tf.concat([adjusted_coords_xy, adjusted_coords_wh], 3)
+
+        adjusted_c = expit_tensor(net_out_reshape[:, :, :, :, 4])
+        adjusted_c = tf.reshape(adjusted_c, [-1, H * W, B, 1])
+
+        adjusted_net_out = tf.concat([adjusted_coords_xy, adjusted_coords_wh, adjusted_c], 3)
+
+        wh = tf.pow(coords[:, :, :, 2:4], 2) * np.reshape([W, H], [1, 1, 1, 2])
+        area_pred = wh[:, :, :, 0] * wh[:, :, :, 1]
+        centers = coords[:, :, :, 0:2]
+        floor = centers - (wh * .5)
+        ceil = centers + (wh * .5)
+
+        # calculate the intersection areas
+        intersect_upleft = tf.maximum(floor, self.upleft)
+        intersect_botright = tf.minimum(ceil, self.botright)
+        intersect_wh = intersect_botright - intersect_upleft
+        intersect_wh = tf.maximum(intersect_wh, 0.0)
+        intersect = tf.multiply(intersect_wh[:, :, :, 0], intersect_wh[:, :, :, 1])
+
+        # calculate the best IOU, set 0.0 confidence for worse boxes
+        iou = tf.truediv(intersect, self.areas + area_pred - intersect)
+        best_box = tf.equal(iou, tf.reduce_max(iou, [2], True))
+        best_box = tf.to_float(best_box)
+        confs = tf.multiply(best_box, self.confs)
+
+        # take care of the weight terms
+        conid = snoob * (1. - confs) + sconf * confs
+        weight_coo = tf.concat(4 * [tf.expand_dims(confs, -1)], 3)
+        cooid = scoor * weight_coo
+
+
+        # self.fetch += [confs, conid, cooid]
+        true = tf.concat([self.coord, tf.expand_dims(confs, 3)], 3)
+        wght = tf.concat([cooid, tf.expand_dims(conid, 3)], 3)
+
+        loss = tf.pow(adjusted_net_out - true, 2)
+        loss = tf.multiply(loss, wght)
+
+        tf.summary.scalar('loss_cx', tf.reduce_sum(loss, [0, 1, 2])[0])
+        tf.summary.scalar('loss_cy', tf.reduce_sum(loss, [0, 1, 2])[1])
+        tf.summary.scalar('loss_w_root', tf.reduce_sum(loss, [0, 1, 2])[2])
+        tf.summary.scalar('loss_h_root', tf.reduce_sum(loss, [0, 1, 2])[3])
+        tf.summary.scalar('loss_obj', tf.reduce_sum(loss, [0, 1, 2])[4])
+
+        loss = tf.reshape(loss, [-1, H * W * B * (4 + 1)])
+        loss = tf.reduce_sum(loss, 1)
+        loss = .5 * tf.reduce_mean(loss, name=name)
+        tf.summary.scalar('total loss', loss)
+
+        return loss
+
+    def _batch(self, bboxes, training_schedule):
+        """
+        Takes a chunk of parsed annotations
+        returns value for placeholders of net's
+        input & loss layer correspond to this chunk
+        :param box: box.x1, box.y1, box.x2, box.y2
+        """
+        meta = training_schedule
+        S, B = meta['side'], meta['num']
+        w, h = 10, 10        # 10 is self.bbox's width, height
+        # Calculate regression target
+        cellx = 1. * w / S
+        celly = 1. * h / S
+
+        count = 0
+        for idx, bbox in enumerate(bboxes):
+            obj = [0, 0, 0, 0, 0]
+
+            centerx = .5 * (bbox[0] + bbox[2])  # xmin, xmax
+            centery = .5 * (bbox[1] + bbox[3])  # ymin, ymax
+            cx = centerx / cellx
+            cy = centery / celly
+            # if cx >= S or cy >= S:
+            #     raise ('center point error')
+            #     return None, None
+            obj[3] = (bbox[2] - bbox[0]) / w
+            obj[4] = (bbox[3] - bbox[1]) / h
+            obj[3] = np.sqrt(obj[3])
+            obj[4] = np.sqrt(obj[4])
+            obj[1] = cx - np.floor(cx)  # centerx
+            obj[2] = cy - np.floor(cy)  # centery
+            obj += [int(np.floor(cy) * S + np.floor(cx))]
+
+
+
+
+            # show(im, allobj, S, w, h, cellx, celly) # unit test
+
+            # Calculate placeholders' values
+            confs = np.zeros([S * S, B])
+            coord = np.zeros([S * S, B, 4])
+            prear = np.zeros([S * S, 4])
+
+            try:
+                coord[obj[5], :, :] = [obj[1:5]] * B
+                prear[obj[5], 0] = obj[1] - obj[3] ** 2 * .5 * S  # xleft
+                prear[obj[5], 1] = obj[2] - obj[4] ** 2 * .5 * S  # yup
+                prear[obj[5], 2] = obj[1] + obj[3] ** 2 * .5 * S  # xright
+                prear[obj[5], 3] = obj[2] + obj[4] ** 2 * .5 * S  # ybot
+                confs[obj[5], :] = [1.] * B
+
+            except IndexError:
+                logger.debug(str(idx)+' is not boundary')
+                logger.debug('cx is ' + str(np.floor(cx)))
+                logger.debug('cy is ' + str(np.floor(cy)))
+                raise
+
+            # Finalise the placeholders' values
+            upleft = np.expand_dims(prear[:, 0:2], 1)
+            botright = np.expand_dims(prear[:, 2:4], 1)
+            wh = botright - upleft
+            area = wh[:, :, 0] * wh[:, :, 1]
+
+            upleft = np.concatenate([upleft] * B, 1)
+            botright = np.concatenate([botright] * B, 1)
+            areas = np.concatenate([area] * B, 1)
+
+            confs = np.expand_dims(confs, 0)
+            coord = np.expand_dims(coord, 0)
+            upleft = np.expand_dims(upleft, 0)
+            botright = np.expand_dims(botright, 0)
+            areas = np.expand_dims(areas, 0)
+            if not count == 0:
+                batch_confs = np.concatenate([batch_confs, confs], axis=0)
+                batch_coord = np.concatenate([batch_coord, coord], axis=0)
+                batch_upleft = np.concatenate([batch_upleft, upleft], axis=0)
+                batch_botright = np.concatenate([batch_botright, botright], axis=0)
+                batch_areas = np.concatenate([batch_areas, areas], axis=0)
+            else:
+                batch_confs = confs
+                batch_coord = coord
+                batch_upleft = upleft
+                batch_botright = botright
+                batch_areas = areas
+            count += 1
+
+        feed_val = {
+            'confs': batch_confs, 'coord': batch_coord,
+            'areas': batch_areas, 'upleft': batch_upleft,
+            'botright': batch_botright
+        }
+        return feed_val
 
     def _conv_relu_layer(self,bottom,filter_size, strides, pad = 0,bias_init = 0.0, group = 1, trainable = False, name = None):
         with tf.name_scope(name) as scope:
@@ -162,7 +359,7 @@ class TRACKNET:
             #                      weight_decay)
 
 
-            out2 = tf.nn.relu(out, name=scope)
+            out2 = LeakyReLU(out, alpha=0.1, name=scope)
             _activation_summary(out2)
             out2 = tf.Print(out2, [tf.shape(out2)], message='Shape of %s' % name, first_n = 1, summarize=4)
             return out2
@@ -186,7 +383,7 @@ class TRACKNET:
 
 
 
-            top = tf.nn.relu(fc_weights, name=scope)
+            top = LeakyReLU(fc_weights, alpha=0.1, name=scope)
             _activation_summary(top)
             top = tf.Print(top, [tf.shape(top)], message='Shape of %s' % name, first_n = 1, summarize=4)
             return top
