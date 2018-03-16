@@ -19,7 +19,7 @@ POLICY = {
     'max_iter': 1200000,
 
     'NUM_EPOCHS': 100000,
-    'BATCH_SIZE': 32,
+    'BATCH_SIZE': 16,
     'WIDTH': 227,
     'HEIGHT': 227,
     'kGeneratedExamplesPerImage': 1,
