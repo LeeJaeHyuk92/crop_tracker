@@ -259,7 +259,7 @@ if __name__ == "__main__":
 
             start_time = time.time()
             cur_batch = data_reader(objLoaderImgNet, train_imagenet_images, train_alov_videos)
-            # logger.debug('data_reader: time elapsed: %.3f' % (time.time() - start_time))
+            logger.debug('data_reader: time elapsed: %.3f' % (time.time() - start_time))
 
             start_time = time.time()
             if DEBUG:
@@ -286,7 +286,7 @@ if __name__ == "__main__":
                                                                          tracknet.upleft: feed_val['upleft'],
                                                                          tracknet.botright: feed_val['botright'],
                                                                          tracknet.areas: feed_val['areas']})
-            # logger.debug('Train: time elapsed: %.3fs, average_loss: %f' % (time.time() - start_time, loss))
+            logger.debug('Train: time elapsed: %.3fs, average_loss: %f' % (time.time() - start_time, loss))
 
             if i % 10 == 0 and i > start:
                 summary = sess.run(merged_summary, feed_dict={tracknet.image: cur_batch[0],
