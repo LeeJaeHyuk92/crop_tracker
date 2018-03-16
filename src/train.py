@@ -112,7 +112,7 @@ def data_reader(objLoaderImgNet, train_imagenet_images, train_alov_videos):
         targets = []
         bbox_gt_scaleds = []
 
-        random_bool = np.random.randint(1, 2)
+        random_bool = np.random.randint(0, 2)
         if random_bool == 0:
             image, bbox = train_image(objLoaderImgNet, train_imagenet_images)
             objExampleGen.reset(bbox, bbox, image, image)
@@ -209,7 +209,13 @@ if __name__ == "__main__":
     train_alov_videos = objLoaderAlov.get_videos()
 
     # batch_queue = next_batch(objLoaderImgNet, train_imagenet_images, train_alov_videos)
-    total_image_size = len(train_imagenet_images)#  + len(train_alov_videos.annotations)
+    alov_images = 0
+    for vid_idx in xrange(len(train_alov_videos)):
+        video = train_alov_videos[vid_idx]
+        annos = video.annotations
+        alov_images += len(annos)
+    total_image_size = len(train_imagenet_images) + alov_images
+    logger.info('total training image size is: IMAGENET: ' + str(len(train_imagenet_images)) + ' and ALOV: ' + str(alov_images))
     tracknet = goturn_net.TRACKNET(BATCH_SIZE)
     tracknet.build()
 
@@ -250,16 +256,10 @@ if __name__ == "__main__":
                     save_ckpt = "checkpoint.ckpt"
                     last_save_itr = i
                     model_saver.save(sess, "checkpoints/" + save_ckpt, global_step=i + 1)
-            print(global_step.eval(session=sess))
 
             start_time = time.time()
-            # cur_batch = sess.run(batch_queue)
             cur_batch = data_reader(objLoaderImgNet, train_imagenet_images, train_alov_videos)
-            logger.debug('data_reader: time elapsed: %.3f' % (time.time() - start_time))
-
-            # start_time = time.time()
-            # cur_batch = sess.run(cur_batch)
-            # logger.debug('runtime: time elapsed: %.3f' % (time.time() - start_time))
+            # logger.debug('data_reader: time elapsed: %.3f' % (time.time() - start_time))
 
             start_time = time.time()
             if DEBUG:
@@ -273,7 +273,11 @@ if __name__ == "__main__":
                     cv2.imwrite(str(idx) + '_' + 'target.jpg', cur_batch[1][idx])
 
 
-            feed_val = tracknet._batch(cur_batch[2], POLICY)
+            feed_val, error_box_index = tracknet._batch(cur_batch[2], POLICY)
+            cur_batch[0] = np.delete(cur_batch[0], error_box_index, 0)
+            cur_batch[1] = np.delete(cur_batch[1], error_box_index, 0)
+            cur_batch[2] = np.delete(cur_batch[2], error_box_index, 0)
+
             [_, loss] = sess.run([train_step, tracknet.loss], feed_dict={tracknet.image: cur_batch[0],
                                                                          tracknet.target: cur_batch[1],
                                                                          tracknet.bbox: cur_batch[2],
@@ -282,8 +286,7 @@ if __name__ == "__main__":
                                                                          tracknet.upleft: feed_val['upleft'],
                                                                          tracknet.botright: feed_val['botright'],
                                                                          tracknet.areas: feed_val['areas']})
-            logger.debug(
-                'Train: time elapsed: %.3fs, average_loss: %f' % (time.time() - start_time, loss))
+            # logger.debug('Train: time elapsed: %.3fs, average_loss: %f' % (time.time() - start_time, loss))
 
             if i % 10 == 0 and i > start:
                 summary = sess.run(merged_summary, feed_dict={tracknet.image: cur_batch[0],

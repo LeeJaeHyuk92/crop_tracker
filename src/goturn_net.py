@@ -243,6 +243,8 @@ class TRACKNET:
         input & loss layer correspond to this chunk
         :param box: box.x1, box.y1, box.x2, box.y2
         """
+        error_box_index = []
+
         meta = training_schedule
         S, B = meta['side'], meta['num']
         w, h = 10, 10        # 10 is self.bbox's width, height
@@ -287,47 +289,47 @@ class TRACKNET:
                 prear[obj[5], 3] = obj[2] + obj[4] ** 2 * .5 * S  # ybot
                 confs[obj[5], :] = [1.] * B
 
+                # Finalise the placeholders' values
+                upleft = np.expand_dims(prear[:, 0:2], 1)
+                botright = np.expand_dims(prear[:, 2:4], 1)
+                wh = botright - upleft
+                area = wh[:, :, 0] * wh[:, :, 1]
+
+                upleft = np.concatenate([upleft] * B, 1)
+                botright = np.concatenate([botright] * B, 1)
+                areas = np.concatenate([area] * B, 1)
+
+                confs = np.expand_dims(confs, 0)
+                coord = np.expand_dims(coord, 0)
+                upleft = np.expand_dims(upleft, 0)
+                botright = np.expand_dims(botright, 0)
+                areas = np.expand_dims(areas, 0)
+                if not count == 0:
+                    batch_confs = np.concatenate([batch_confs, confs], axis=0)
+                    batch_coord = np.concatenate([batch_coord, coord], axis=0)
+                    batch_upleft = np.concatenate([batch_upleft, upleft], axis=0)
+                    batch_botright = np.concatenate([batch_botright, botright], axis=0)
+                    batch_areas = np.concatenate([batch_areas, areas], axis=0)
+                else:
+                    batch_confs = confs
+                    batch_coord = coord
+                    batch_upleft = upleft
+                    batch_botright = botright
+                    batch_areas = areas
+                count += 1
+
             except IndexError:
-                logger.debug(str(idx)+' is not boundary')
-                logger.debug('cx is ' + str(np.floor(cx)))
-                logger.debug('cy is ' + str(np.floor(cy)))
-                raise
-
-            # Finalise the placeholders' values
-            upleft = np.expand_dims(prear[:, 0:2], 1)
-            botright = np.expand_dims(prear[:, 2:4], 1)
-            wh = botright - upleft
-            area = wh[:, :, 0] * wh[:, :, 1]
-
-            upleft = np.concatenate([upleft] * B, 1)
-            botright = np.concatenate([botright] * B, 1)
-            areas = np.concatenate([area] * B, 1)
-
-            confs = np.expand_dims(confs, 0)
-            coord = np.expand_dims(coord, 0)
-            upleft = np.expand_dims(upleft, 0)
-            botright = np.expand_dims(botright, 0)
-            areas = np.expand_dims(areas, 0)
-            if not count == 0:
-                batch_confs = np.concatenate([batch_confs, confs], axis=0)
-                batch_coord = np.concatenate([batch_coord, coord], axis=0)
-                batch_upleft = np.concatenate([batch_upleft, upleft], axis=0)
-                batch_botright = np.concatenate([batch_botright, botright], axis=0)
-                batch_areas = np.concatenate([batch_areas, areas], axis=0)
-            else:
-                batch_confs = confs
-                batch_coord = coord
-                batch_upleft = upleft
-                batch_botright = botright
-                batch_areas = areas
-            count += 1
+                logger.error(str(idx)+' is not boundary')
+                logger.error('cx is ' + str(np.floor(cx)))
+                logger.error('cy is ' + str(np.floor(cy)))
+                error_box_index.append(idx)
 
         feed_val = {
             'confs': batch_confs, 'coord': batch_coord,
             'areas': batch_areas, 'upleft': batch_upleft,
             'botright': batch_botright
         }
-        return feed_val
+        return feed_val, error_box_index
 
     def _conv_relu_layer(self,bottom,filter_size, strides, pad = 0,bias_init = 0.0, group = 1, trainable = False, name = None):
         with tf.name_scope(name) as scope:
