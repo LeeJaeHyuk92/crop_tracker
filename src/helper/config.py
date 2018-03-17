@@ -42,6 +42,7 @@ POLICY = {
     'thresh':  .3,
     'num': 1,
     'anchors': [3.5, 3.5],
+    'pretrained_model' : '/datahdd/workdir/jaehyuk/dataset/pretraied/GOTURN/checkpoints/checkpoint.ckpt-1',
     'PATHS': {
         'train': './data/tfrecords/train_1_adj.tfrecords',
         'validate': './data/tfrecords/tfc_val.tfrecords',

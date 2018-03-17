@@ -21,10 +21,11 @@ NUM_EPOCHS = POLICY['NUM_EPOCHS']
 BATCH_SIZE = POLICY['BATCH_SIZE']
 WIDTH = POLICY['WIDTH']
 HEIGHT = POLICY['HEIGHT']
+pretraind_model = POLICY['pretrained_model']
 kGeneratedExamplesPerImage = POLICY['kGeneratedExamplesPerImage']
 logfile = POLICY['logfile']
 train_txt = "test_set.txt"
-pretraind_model = './checkpoints/checkpoint.ckpt-19001'
+
 
 run_config = tf.ConfigProto()
 run_config.gpu_options.allow_growth = True
@@ -247,6 +248,7 @@ if __name__ == "__main__":
         logger.info("start by iteration: %d" % (start))
         saver = tf.train.Saver()
         saver.restore(sess, ckpt.model_checkpoint_path)
+        logger.info("model is restored using " + str(ckpt))
     elif pretraind_model:
         restore = {}
         from tensorflow.contrib.framework.python.framework.checkpoint_utils import list_variables
@@ -258,6 +260,7 @@ if __name__ == "__main__":
                     restore[scope[0]] = variables_to_restore[0]                                # variables_to_restore is list : [op]
         saver = tf.train.Saver(restore)
         saver.restore(sess, pretraind_model)
+        logger.info("model is restored using " + str(pretraind_model))
 
     assign_op = global_step.assign(start)
     sess.run(assign_op)
