@@ -24,6 +24,7 @@ HEIGHT = POLICY['HEIGHT']
 kGeneratedExamplesPerImage = POLICY['kGeneratedExamplesPerImage']
 logfile = POLICY['logfile']
 train_txt = "test_set.txt"
+pretraind_model = './checkpoints/checkpoint.ckpt-19001'
 
 run_config = tf.ConfigProto()
 run_config.gpu_options.allow_growth = True
@@ -240,11 +241,24 @@ if __name__ == "__main__":
         os.makedirs(ckpt_dir)
     ckpt = tf.train.get_checkpoint_state(ckpt_dir)
     start = 0
+
     if ckpt and ckpt.model_checkpoint_path:
         start = int(ckpt.model_checkpoint_path.split("-")[1])
         logger.info("start by iteration: %d" % (start))
         saver = tf.train.Saver()
         saver.restore(sess, ckpt.model_checkpoint_path)
+    elif pretraind_model:
+        restore = {}
+        from tensorflow.contrib.framework.python.framework.checkpoint_utils import list_variables
+        slim = tf.contrib.slim
+        for scope in list_variables(pretraind_model):
+            if not 'fc4' in scope[0]:
+                variables_to_restore = slim.get_variables(scope=scope[0])
+                if variables_to_restore:
+                    restore[scope[0]] = variables_to_restore[0]                                # variables_to_restore is list : [op]
+        saver = tf.train.Saver(restore)
+        saver.restore(sess, pretraind_model)
+
     assign_op = global_step.assign(start)
     sess.run(assign_op)
     model_saver = tf.train.Saver(max_to_keep=3)
