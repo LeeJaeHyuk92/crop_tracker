@@ -8,8 +8,8 @@ POLICY = {
     'alov': './ALOV',
     'lamda_shift': 5.,
     'lamda_scale': 15.,
-    'min_scale': 0.,
-    'max_scale': 0.,
+    'min_scale': -0.4,
+    'max_scale': 0.4,
 
     'step_values': [400000, 600000, 800000, 1000000],
     'learning_rates': [0.0001, 0.00005, 0.000025, 0.0000125, 0.00000625],
@@ -42,7 +42,7 @@ POLICY = {
     'thresh':  .3,
     'num': 1,
     'anchors': [3.5, 3.5],
-    'pretrained_model' : '/datahdd/workdir/jaehyuk/dataset/pretraied/GOTURN/checkpoints/checkpoint.ckpt-1',
+    'pretrained_model' : '/datahdd/workdir/jaehyuk/dataset/pretrained/GOTURN/checkpoints/checkpoint.ckpt-1',
     'PATHS': {
         'train': './data/tfrecords/train_1_adj.tfrecords',
         'validate': './data/tfrecords/tfc_val.tfrecords',
