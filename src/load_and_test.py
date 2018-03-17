@@ -92,23 +92,26 @@ def calculate_box(net_out):
     adjusted_net_out = np.concatenate([adjusted_coords_xy, adjusted_coords_wh, adjusted_c], 3)
 
     # find max objscore box TODO, if you need NMS, add it
-    top_obj_indexs = np.where(adjusted_net_out[..., 4] == np.max(adjusted_net_out[..., 4]))
+    # top_obj_indexs = np.where(adjusted_net_out[..., 4] == np.max(adjusted_net_out[..., 4]))
+    top_obj_indexs = np.where(adjusted_net_out[..., 4] > POLICY['thresh'])
     objectness_s = adjusted_net_out[top_obj_indexs][..., 4]
 
+    pred_box=[]
     for idx, objectness in np.ndenumerate(objectness_s):
         predict = adjusted_net_out[top_obj_indexs]
         pred_cx = (float(top_obj_indexs[1][idx]) + predict[idx][0]) / W * w
         pred_cy = (float(top_obj_indexs[0][idx]) + predict[idx][1]) / H * h
-        pred_w = predict[idx][2] / W * w
-        pred_h = predict[idx][3] / H * h
+        pred_w = predict[idx][2] * w
+        pred_h = predict[idx][3] * h
         pred_obj = predict[idx][4]
 
-        pred_xl = int(pred_cx - pred_w / 2)
-        pred_yl = int(pred_cy - pred_h / 2)
-        pred_xr = int(pred_cx + pred_w / 2)
-        pred_yr = int(pred_cy + pred_h / 2)
+        pred_xl = pred_cx - pred_w / 2
+        pred_yl = pred_cy - pred_h / 2
+        pred_xr = pred_cx + pred_w / 2
+        pred_yr = pred_cy + pred_h / 2
 
-    return [pred_xl, pred_yl, pred_xr, pred_yr]
+        pred_box.append([pred_xl, pred_yl, pred_xr, pred_yr, pred_obj])
+    return pred_box
 
         # if objectness > POLICY['thresh']:
         #     pred_cimg = cv2.rectangle(cimg, (pred_xl, pred_yl), (pred_xr, pred_yr), (0, 255, 0), 3)
@@ -166,8 +169,9 @@ if __name__ == "__main__":
             cur_batch = sess.run(batch_queue)
 
             import cv2
-            cv2.imwrite(str(i) + '_test' + 'image.jpg', cur_batch[1][0,...].astype(np.uint8))
-            feed_val = tracknet._batch(cur_batch[2], POLICY)
+            # cv2.imwrite(str(i) + '_test' + 'image.jpg', cur_batch[1][0,...].astype(np.uint8))
+
+            feed_val, _ = tracknet._batch(cur_batch[2], POLICY)
             start_time = time.time()
             [batch_loss, fc4] = sess.run([tracknet.loss, tracknet.fc4], feed_dict={tracknet.image: cur_batch[0],
                                                                                    tracknet.target: cur_batch[1],
@@ -186,10 +190,17 @@ if __name__ == "__main__":
                                                      tracknet.upleft: feed_val['upleft'],
                                                      tracknet.botright: feed_val['botright'],
                                                      tracknet.areas: feed_val['areas']})
-            predict_box = calculate_box(fc4)
+            predict_boxes = calculate_box(fc4)
+            image = cur_batch[0][0, ...].astype(np.uint8)
+            for pbox in predict_boxes:
+                image = cv2.rectangle(image, (int(227 * pbox[0]/10), int(227 * pbox[1]/10)),
+                                      (int(227 * pbox[2]/10), int(227 * pbox[3]/10)), (0, 255, 0), 2)
+                cv2.putText(image, str(pbox[4]), (int(227 * pbox[0]/10), int(227 * pbox[1]/10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255),
+                            2)
+            cv2.imwrite(str(i) + '_pred_' + 'image.jpg', image)
 
             logging.info('temp: %s' % (temp))
-            logging.info('batch box: %s' %(predict_box))
+            logging.info('batch box: %s' %(predict_boxes))
             logging.info('gt batch box: %s' %(cur_batch[2]))
             logging.info('batch loss = %f'%(batch_loss))
             logging.debug('test: time elapsed: %.3fs.'%(time.time()-start_time))
