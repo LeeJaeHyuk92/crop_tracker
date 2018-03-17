@@ -39,7 +39,7 @@ POLICY = {
     'noobject_scale': 1,
     'class_scale': 1,
     'coord_scale': 1,
-    'thresh ':  .6,
+    'thresh':  .3,
     'num': 1,
     'anchors': [3.5, 3.5],
     'PATHS': {

@@ -1,4 +1,2 @@
-model_checkpoint_path: "checkpoint.ckpt-21001"
-all_model_checkpoint_paths: "checkpoint.ckpt-19001"
-all_model_checkpoint_paths: "checkpoint.ckpt-20001"
-all_model_checkpoint_paths: "checkpoint.ckpt-21001"
+model_checkpoint_path: "checkpoint.ckpt-23283"
+all_model_checkpoint_paths: "checkpoint.ckpt-23283"
