@@ -3,7 +3,9 @@
 # Name: Nrupatunga
 # Description: bounding box class
 
+import numpy as np
 from ..helper.helper import sample_exp_two_sides, sample_rand_uniform
+from ..helper.config import POLICY
 
 
 class BoundingBox:
@@ -231,3 +233,123 @@ class BoundingBox:
         bbox_rand.y2 = new_center_y + new_height / 2
 
         return bbox_rand
+
+
+def expit_tensor(x):
+	return 1. / (1. + np.exp(-x))
+
+
+# Malisiewicz et al.
+def non_max_suppression_fast(boxes, overlapThresh):
+    # if there are no boxes, return an empty list
+
+    boxes = np.array(boxes)
+    if len(boxes) == 0:
+        return []
+
+    # if the bounding boxes integers, convert them to floats --
+    # this is important since we'll be doing a bunch of divisions
+    if boxes.dtype.kind == "i":
+        boxes = boxes.astype("float")
+
+    # initialize the list of picked indexes
+    pick = []
+
+    # grab the coordinates of the bounding boxes
+    x1 = boxes[:, 0]
+    y1 = boxes[:, 1]
+    x2 = boxes[:, 2]
+    y2 = boxes[:, 3]
+
+    # compute the area of the bounding boxes and sort the bounding
+    # boxes by the bottom-right y-coordinate of the bounding box
+    area = (x2 - x1 + 1) * (y2 - y1 + 1)
+    idxs = np.argsort(y2)
+
+    # keep looping while some indexes still remain in the indexes
+    # list
+    while len(idxs) > 0:
+        # grab the last index in the indexes list and add the
+        # index value to the list of picked indexes
+        last = len(idxs) - 1
+        i = idxs[last]
+        pick.append(i)
+
+        # find the largest (x, y) coordinates for the start of
+        # the bounding box and the smallest (x, y) coordinates
+        # for the end of the bounding box
+        xx1 = np.maximum(x1[i], x1[idxs[:last]])
+        yy1 = np.maximum(y1[i], y1[idxs[:last]])
+        xx2 = np.minimum(x2[i], x2[idxs[:last]])
+        yy2 = np.minimum(y2[i], y2[idxs[:last]])
+
+        # compute the width and height of the bounding box
+        w = np.maximum(0, xx2 - xx1 + 1)
+        h = np.maximum(0, yy2 - yy1 + 1)
+
+        # compute the ratio of overlap
+        overlap = (w * h) / area[idxs[:last]]
+
+        # delete all indexes from the index list that have
+        idxs = np.delete(idxs, np.concatenate(([last],
+                                               np.where(overlap > overlapThresh)[0])))
+
+    # return only the bounding boxes that were picked using the
+    # float data type
+    return boxes[pick]
+
+
+def calculate_box(net_out):
+    H, W = POLICY['side'], POLICY['side']
+    B = POLICY['num']
+    anchors = POLICY['anchors']
+    w, h = 10, 10
+    # TODO, compare with tf implementation
+    # calculate box
+    net_out_reshape = np.reshape(net_out, [H, W, B, (4 + 1)])
+    coords = net_out_reshape[:, :, :, :4]
+    adjusted_coords_xy = expit_tensor(coords[:, :, :, 0:2])
+    adjusted_coords_wh = np.exp(coords[:, :, :, 2:4]) * np.reshape(anchors, [1, 1, B, 2]) / np.reshape([W, H],
+                                                                                                       [1, 1, 1, 2])
+    adjusted_c = expit_tensor(net_out_reshape[:, :, :, 4:])
+    adjusted_net_out = np.concatenate([adjusted_coords_xy, adjusted_coords_wh, adjusted_c], 3)
+
+    # find max objscore box TODO, if you need NMS, add it
+    top_obj_indexs = np.where(adjusted_net_out[..., 4] == np.max(adjusted_net_out[..., 4]))
+    # top_obj_indexs = np.where(adjusted_net_out[..., 4] > POLICY['thresh'])
+    objectness_s = adjusted_net_out[top_obj_indexs][..., 4]
+
+    pred_box=[]
+    for idx, objectness in np.ndenumerate(objectness_s):
+        predict = adjusted_net_out[top_obj_indexs]
+        pred_cx = (float(top_obj_indexs[1][idx]) + predict[idx][0]) / W * w
+        pred_cy = (float(top_obj_indexs[0][idx]) + predict[idx][1]) / H * h
+        pred_w = predict[idx][2] * w
+        pred_h = predict[idx][3] * h
+        pred_obj = predict[idx][4]
+
+        pred_xl = pred_cx - pred_w / 2
+        pred_yl = pred_cy - pred_h / 2
+        pred_xr = pred_cx + pred_w / 2
+        pred_yr = pred_cy + pred_h / 2
+
+        pred_box.append([pred_xl, pred_yl, pred_xr, pred_yr, pred_obj])
+    return pred_box
+
+        # if objectness > POLICY['thresh']:
+        #     pred_cimg = cv2.rectangle(cimg, (pred_xl, pred_yl), (pred_xr, pred_yr), (0, 255, 0), 3)
+        #     cv2.putText(pred_cimg, str(objectness), (pred_xl, pred_yl), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        #     # cv2.imwrite('./result/' + cimg_path, pred_cimg)
+        #     cv2.imwrite('./result/' + cimg_path.split('/')[-2] + "_" + cimg_path.split('/')[-1], pred_cimg)
+        #     print(bcolors.WARNING + cimg_path + bcolors.ENDC)
+        #     print(bcolors.WARNING + "Inference time {:3f}".format(end - start) + "    obj: " + str(
+        #         objectness) + bcolors.ENDC)
+        #
+        # else:
+        #     pred_cimg = cv2.rectangle(cimg, (pred_xl, pred_yl), (pred_xr, pred_yr), (0, 0, 255), 3)
+        #     cv2.putText(pred_cimg, str(objectness), (pred_xl, pred_yl), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+        #     # cv2.imwrite('./result/' + cimg_path, pred_cimg)
+        #     cv2.imwrite('./result/' + cimg_path.split('/')[-2] + "_" + cimg_path.split('/')[-1], pred_cimg)
+        #     print(bcolors.FAIL + cimg_path + bcolors.ENDC)
+        #     print(bcolors.FAIL + "FAIL " + "Inference time {:3f}".format(end - start) + "    obj: " + str(
+        #         objectness) + bcolors.ENDC)

@@ -40,6 +40,7 @@ POLICY = {
     'class_scale': 1,
     'coord_scale': 1,
     'thresh':  .3,
+    'thresh_IOU': .5,
     'num': 1,
     'anchors': [3.5, 3.5],
     'pretrained_model' : '/datahdd/workdir/jaehyuk/dataset/pretrained/GOTURN/checkpoints/checkpoint.ckpt-1',

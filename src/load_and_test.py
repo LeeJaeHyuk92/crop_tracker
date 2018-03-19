@@ -7,7 +7,7 @@ import os
 import goturn_net
 import numpy as np
 from helper.config import POLICY
-import cv2
+from helper.BoundingBox import calculate_box, non_max_suppression_fast
 
 NUM_EPOCHS = 500
 BATCH_SIZE = 1
@@ -72,65 +72,6 @@ def next_batch(input_queue):
     return [search_batch, target_batch, box_batch]
 
 
-def expit_tensor(x):
-	return 1. / (1. + np.exp(-x))
-
-
-def calculate_box(net_out):
-    H, W = POLICY['side'], POLICY['side']
-    B = POLICY['num']
-    anchors = POLICY['anchors']
-    w, h = 10, 10
-    # TODO, compare with tf implementation
-    # calculate box
-    net_out_reshape = np.reshape(net_out, [H, W, B, (4 + 1)])
-    coords = net_out_reshape[:, :, :, :4]
-    adjusted_coords_xy = expit_tensor(coords[:, :, :, 0:2])
-    adjusted_coords_wh = np.exp(coords[:, :, :, 2:4]) * np.reshape(anchors, [1, 1, B, 2]) / np.reshape([W, H],
-                                                                                                       [1, 1, 1, 2])
-    adjusted_c = expit_tensor(net_out_reshape[:, :, :, 4:])
-    adjusted_net_out = np.concatenate([adjusted_coords_xy, adjusted_coords_wh, adjusted_c], 3)
-
-    # find max objscore box TODO, if you need NMS, add it
-    # top_obj_indexs = np.where(adjusted_net_out[..., 4] == np.max(adjusted_net_out[..., 4]))
-    top_obj_indexs = np.where(adjusted_net_out[..., 4] > POLICY['thresh'])
-    objectness_s = adjusted_net_out[top_obj_indexs][..., 4]
-
-    pred_box=[]
-    for idx, objectness in np.ndenumerate(objectness_s):
-        predict = adjusted_net_out[top_obj_indexs]
-        pred_cx = (float(top_obj_indexs[1][idx]) + predict[idx][0]) / W * w
-        pred_cy = (float(top_obj_indexs[0][idx]) + predict[idx][1]) / H * h
-        pred_w = predict[idx][2] * w
-        pred_h = predict[idx][3] * h
-        pred_obj = predict[idx][4]
-
-        pred_xl = pred_cx - pred_w / 2
-        pred_yl = pred_cy - pred_h / 2
-        pred_xr = pred_cx + pred_w / 2
-        pred_yr = pred_cy + pred_h / 2
-
-        pred_box.append([pred_xl, pred_yl, pred_xr, pred_yr, pred_obj])
-    return pred_box
-
-        # if objectness > POLICY['thresh']:
-        #     pred_cimg = cv2.rectangle(cimg, (pred_xl, pred_yl), (pred_xr, pred_yr), (0, 255, 0), 3)
-        #     cv2.putText(pred_cimg, str(objectness), (pred_xl, pred_yl), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        #     # cv2.imwrite('./result/' + cimg_path, pred_cimg)
-        #     cv2.imwrite('./result/' + cimg_path.split('/')[-2] + "_" + cimg_path.split('/')[-1], pred_cimg)
-        #     print(bcolors.WARNING + cimg_path + bcolors.ENDC)
-        #     print(bcolors.WARNING + "Inference time {:3f}".format(end - start) + "    obj: " + str(
-        #         objectness) + bcolors.ENDC)
-        #
-        # else:
-        #     pred_cimg = cv2.rectangle(cimg, (pred_xl, pred_yl), (pred_xr, pred_yr), (0, 0, 255), 3)
-        #     cv2.putText(pred_cimg, str(objectness), (pred_xl, pred_yl), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-        #     # cv2.imwrite('./result/' + cimg_path, pred_cimg)
-        #     cv2.imwrite('./result/' + cimg_path.split('/')[-2] + "_" + cimg_path.split('/')[-1], pred_cimg)
-        #     print(bcolors.FAIL + cimg_path + bcolors.ENDC)
-        #     print(bcolors.FAIL + "FAIL " + "Inference time {:3f}".format(end - start) + "    obj: " + str(
-        #         objectness) + bcolors.ENDC)
-
 if __name__ == "__main__":
     if (os.path.isfile(logfile)):
         os.remove(logfile)
@@ -191,13 +132,14 @@ if __name__ == "__main__":
                                                      tracknet.botright: feed_val['botright'],
                                                      tracknet.areas: feed_val['areas']})
             predict_boxes = calculate_box(fc4)
+            predict_boxes = non_max_suppression_fast(predict_boxes, POLICY['thresh_IOU'])
             image = cur_batch[0][0, ...].astype(np.uint8)
             for pbox in predict_boxes:
                 image = cv2.rectangle(image, (int(227 * pbox[0]/10), int(227 * pbox[1]/10)),
                                       (int(227 * pbox[2]/10), int(227 * pbox[3]/10)), (0, 255, 0), 2)
                 cv2.putText(image, str(pbox[4]), (int(227 * pbox[0]/10), int(227 * pbox[1]/10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255),
                             2)
-            cv2.imwrite(str(i) + '_pred_' + 'image.jpg', image)
+                cv2.imwrite(str(i) + '_pred_' + 'image.jpg', image)
 
             logging.info('temp: %s' % (temp))
             logging.info('batch box: %s' %(predict_boxes))
