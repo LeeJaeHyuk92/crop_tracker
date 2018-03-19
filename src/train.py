@@ -223,7 +223,7 @@ if __name__ == "__main__":
 
     global_step = tf.Variable(0, trainable=False, name="global_step")
 
-    train_step = tf.train.AdamOptimizer(0.0001, 0.9).minimize( \
+    train_step = tf.train.AdamOptimizer(0.00001, 0.9).minimize( \
         tracknet.loss_wdecay, global_step=global_step)
     merged_summary = tf.summary.merge_all()
     sess = tf.Session()
