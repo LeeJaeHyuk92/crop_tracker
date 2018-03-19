@@ -264,10 +264,10 @@ if __name__ == "__main__":
 
     assign_op = global_step.assign(start)
     sess.run(assign_op)
-    model_saver = tf.train.Saver(max_to_keep=3)
+    model_saver = tf.train.Saver(max_to_keep=10)
     try:
         for i in range(start, int((total_image_size) / BATCH_SIZE * NUM_EPOCHS)):
-            if i % int((total_image_size) / BATCH_SIZE * 1000) == 0:
+            if i % int((total_image_size) / BATCH_SIZE) == 0:
                 logger.info("start epoch[%d]" % (int(float(i) / (total_image_size) * BATCH_SIZE)))
                 if i > start:
                     save_ckpt = "checkpoint.ckpt"
