@@ -223,8 +223,15 @@ if __name__ == "__main__":
 
     global_step = tf.Variable(0, trainable=False, name="global_step")
 
-    train_step = tf.train.AdamOptimizer(0.00001, 0.9).minimize( \
-        tracknet.loss_wdecay, global_step=global_step)
+    learning_rate = tf.train.piecewise_constant(global_step,
+                                                [tf.cast(v, tf.int32) for v in POLICY['step_values']],
+                                                POLICY['learning_rates'])
+    train_step = tf.train.AdamOptimizer(learning_rate,
+                                       POLICY['momentum'],
+                                       POLICY['momentum2']).minimize(tracknet.loss_wdecay, global_step=global_step)
+    # train_step = tf.train.AdamOptimizer(0.00001, 0.9).minimize( \
+    #     tracknet.loss_wdecay, global_step=global_step)
+
     merged_summary = tf.summary.merge_all()
     sess = tf.Session()
     train_writer = tf.summary.FileWriter('./train_summary', sess.graph)
