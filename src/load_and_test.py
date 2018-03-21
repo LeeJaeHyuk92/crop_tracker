@@ -1,21 +1,38 @@
 # train file
 
-import logging
 import time
 import tensorflow as tf
 import os
 import goturn_net
 import numpy as np
+import cv2
 from helper.config import POLICY
 from helper.BoundingBox import calculate_box, non_max_suppression_fast
+from loader.loader_vot import loader_vot
+from logger.logger import setup_logger
+from tracker import bbox_estimator
 
+opencv_version = cv2.__version__.split('.')[0]
 NUM_EPOCHS = 500
 BATCH_SIZE = 1
 WIDTH = 227
 HEIGHT = 227
 
+logger = setup_logger(logfile=None)
 logfile = "test.log"
 test_txt = "test_set.txt"
+
+def all_checkpoint(ckpt_dir):
+    ckpt_path = []
+    for ckpt in os.listdir(ckpt_dir):
+        if ckpt =='checkpoint':
+            continue
+
+        if not ckpt.split('.')[0]+ '.' + ckpt.split('.')[1] in ckpt_path:
+            ckpt_path.append(os.path.join(ckpt_dir, ckpt.split('.')[0]+'.'+ckpt.split('.')[1]))
+
+    return ckpt_path
+
 def load_train_test_set(train_file):
     '''
     return train_set or test_set
@@ -72,19 +89,58 @@ def next_batch(input_queue):
     return [search_batch, target_batch, box_batch]
 
 
+def videos_prediction(videos, tracknet, sess, ckpt):
+    video_keys = videos.keys()
+    for i in range(0, len(videos)):
+        video_frames = videos[video_keys[i]][0]
+        annot_frames = videos[video_keys[i]][1]
+
+        num_frames = min(len(video_frames), len(annot_frames))
+
+        # Get the first frame of this video with the intial ground-truth bounding box
+        frame_0 = video_frames[0]
+        bbox_0 = annot_frames[0]
+        sMatImage = cv2.imread(frame_0)
+        bbox_estim.init(sMatImage, bbox_0)
+        for i in xrange(1, num_frames):
+            frame = video_frames[i]
+            sMatImage = cv2.imread(frame)
+            sMatImageDraw = sMatImage.copy()
+            bbox = annot_frames[i]
+
+            if opencv_version == '2':
+                cv2.rectangle(sMatImageDraw, (int(bbox.x1), int(bbox.y1)), (int(bbox.x2), int(bbox.y2)),
+                              (255, 255, 255), 2)
+            else:
+                sMatImageDraw = cv2.rectangle(sMatImageDraw, (int(bbox.x1), int(bbox.y1)), (int(bbox.x2), int(bbox.y2)),
+                                              (255, 255, 255), 2)
+
+                bbox = bbox_estim.track(sMatImage, tracknet, sess)
+            if opencv_version == '2':
+                cv2.rectangle(sMatImageDraw, (int(bbox.x1), int(bbox.y1)), (int(bbox.x2), int(bbox.y2)), (255, 0, 0), 2)
+            else:
+                sMatImageDraw = cv2.rectangle(sMatImageDraw, (int(bbox.x1), int(bbox.y1)), (int(bbox.x2), int(bbox.y2)),
+                                              (255, 0, 0), 2)
+
+            cv2.imwrite('./result/'+ str(ckpt.split('-')[-1]) + "_" + frame.split('/')[-2] + "_" + frame.split('/')[-1], sMatImageDraw)
+            # cv2.imshow('Results', sMatImageDraw)
+            # cv2.waitKey(10)
+
+
 if __name__ == "__main__":
     if (os.path.isfile(logfile)):
         os.remove(logfile)
-    logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-        level=logging.DEBUG,filename=logfile)
+    # logger.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
+    #     level=logger.DEBUG,filename=logfile)
 
-    [train_target, train_search, train_box] = load_train_test_set(test_txt)
-    target_tensors = tf.convert_to_tensor(train_target, dtype=tf.string)
-    search_tensors = tf.convert_to_tensor(train_search, dtype=tf.string)
-    box_tensors = tf.convert_to_tensor(train_box, dtype=tf.float64)
-    input_queue = tf.train.slice_input_producer([search_tensors, target_tensors, box_tensors],shuffle=False)
-    batch_queue = next_batch(input_queue)
-    tracknet = goturn_net.TRACKNET(BATCH_SIZE, train = False)
+    # [train_target, train_search, train_box] = load_train_test_set(test_txt)
+    # target_tensors = tf.convert_to_tensor(train_target, dtype=tf.string)
+    # search_tensors = tf.convert_to_tensor(train_search, dtype=tf.string)
+    # box_tensors = tf.convert_to_tensor(train_box, dtype=tf.float64)
+    # input_queue = tf.train.slice_input_producer([search_tensors, target_tensors, box_tensors],shuffle=False)
+    # batch_queue = next_batch(input_queue)
+    bbox_estim = bbox_estimator(False, logger)
+    tracknet = goturn_net.TRACKNET(BATCH_SIZE, train=False)
     tracknet.build()
 
 
@@ -99,54 +155,65 @@ if __name__ == "__main__":
     tf.train.start_queue_runners(sess=sess, coord=coord)
 
     ckpt_dir = "./checkpoints"
+
+
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)
-    ckpt = tf.train.get_checkpoint_state(ckpt_dir)
-    if ckpt and ckpt.model_checkpoint_path:
+    all_ckpt = all_checkpoint(ckpt_dir)
+    # ckpt = tf.train.get_checkpoint_state(ckpt_dir)
+    # if ckpt and ckpt.model_checkpoint_path:
+    #     saver = tf.train.Saver()
+    #     saver.restore(sess, ckpt.model_checkpoint_path)
+    for ckpt in all_ckpt:
         saver = tf.train.Saver()
-        saver.restore(sess, ckpt.model_checkpoint_path)
-    try:
-        for i in range(0, int(len(train_box)/BATCH_SIZE)):
-            cur_batch = sess.run(batch_queue)
+        saver.restore(sess, ckpt)
+        print(str(ckpt) + " is restored")
+        try:
+            # for i in range(0, int(len(train_box)/BATCH_SIZE)):
+                # cur_batch = sess.run(batch_queue)
 
-            import cv2
-            # cv2.imwrite(str(i) + '_test' + 'image.jpg', cur_batch[1][0,...].astype(np.uint8))
+                # import cv2
+                # cv2.imwrite(str(i) + '_test' + 'image.jpg', cur_batch[1][0,...].astype(np.uint8))
 
-            feed_val, _ = tracknet._batch(cur_batch[2], POLICY)
-            start_time = time.time()
-            [batch_loss, fc4] = sess.run([tracknet.loss, tracknet.fc4], feed_dict={tracknet.image: cur_batch[0],
-                                                                                   tracknet.target: cur_batch[1],
-                                                                                   tracknet.bbox: cur_batch[2],
-                                                                                   tracknet.confs: feed_val['confs'],
-                                                                                   tracknet.coord: feed_val['coord'],
-                                                                                   tracknet.upleft: feed_val['upleft'],
-                                                                                   tracknet.botright: feed_val['botright'],
-                                                                                   tracknet.areas: feed_val['areas']})
+            objLoaderVot = loader_vot(POLICY['vot2015'], logger)
+            videos = objLoaderVot.get_videos()
+            videos_prediction(videos, tracknet, sess, ckpt)
 
-            temp = sess.run(tracknet.fc2, feed_dict={tracknet.image: cur_batch[0],
-                                                     tracknet.target: cur_batch[1],
-                                                     tracknet.bbox: cur_batch[2],
-                                                     tracknet.confs: feed_val['confs'],
-                                                     tracknet.coord: feed_val['coord'],
-                                                     tracknet.upleft: feed_val['upleft'],
-                                                     tracknet.botright: feed_val['botright'],
-                                                     tracknet.areas: feed_val['areas']})
-            predict_boxes = calculate_box(fc4)
-            predict_boxes = non_max_suppression_fast(predict_boxes, POLICY['thresh_IOU'])
-            image = cur_batch[0][0, ...].astype(np.uint8)
-            for pbox in predict_boxes:
-                image = cv2.rectangle(image, (int(227 * pbox[0]/10), int(227 * pbox[1]/10)),
-                                      (int(227 * pbox[2]/10), int(227 * pbox[3]/10)), (0, 255, 0), 2)
-                cv2.putText(image, str(pbox[4]), (int(227 * pbox[0]/10), int(227 * pbox[1]/10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255),
-                            2)
-                cv2.imwrite(str(i) + '_pred_' + 'image.jpg', image)
-
-            logging.info('temp: %s' % (temp))
-            logging.info('batch box: %s' %(predict_boxes))
-            logging.info('gt batch box: %s' %(cur_batch[2]))
-            logging.info('batch loss = %f'%(batch_loss))
-            logging.debug('test: time elapsed: %.3fs.'%(time.time()-start_time))
-    except KeyboardInterrupt:
-        print("get keyboard interrupt")
+                # feed_val, _ = tracknet._batch(cur_batch[2], POLICY)
+                # start_time = time.time()
+                # [batch_loss, fc4] = sess.run([tracknet.loss, tracknet.fc4], feed_dict={tracknet.image: cur_batch[0],
+                #                                                                        tracknet.target: cur_batch[1],
+                #                                                                        tracknet.bbox: cur_batch[2],
+                #                                                                        tracknet.confs: feed_val['confs'],
+                #                                                                        tracknet.coord: feed_val['coord'],
+                #                                                                        tracknet.upleft: feed_val['upleft'],
+                #                                                                        tracknet.botright: feed_val['botright'],
+                #                                                                        tracknet.areas: feed_val['areas']})
+                #
+                # temp = sess.run(tracknet.fc2, feed_dict={tracknet.image: cur_batch[0],
+                #                                          tracknet.target: cur_batch[1],
+                #                                          tracknet.bbox: cur_batch[2],
+                #                                          tracknet.confs: feed_val['confs'],
+                #                                          tracknet.coord: feed_val['coord'],
+                #                                          tracknet.upleft: feed_val['upleft'],
+                #                                          tracknet.botright: feed_val['botright'],
+                #                                          tracknet.areas: feed_val['areas']})
+                # predict_boxes = calculate_box(fc4)
+                # predict_boxes = non_max_suppression_fast(predict_boxes, POLICY['thresh_IOU'])
+                # image = cur_batch[0][0, ...].astype(np.uint8)
+                # for pbox in predict_boxes:
+                #     image = cv2.rectangle(image, (int(227 * pbox[0]/10), int(227 * pbox[1]/10)),
+                #                           (int(227 * pbox[2]/10), int(227 * pbox[3]/10)), (0, 255, 0), 2)
+                #     cv2.putText(image, str(pbox[4]), (int(227 * pbox[0]/10), int(227 * pbox[1]/10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255),
+                #                 2)
+                #     cv2.imwrite(str(i) + '_pred_' + 'image.jpg', image)
+                #
+                # logger.info('temp: %s' % (temp))
+                # logger.info('batch box: %s' %(predict_boxes))
+                # logger.info('gt batch box: %s' %(cur_batch[2]))
+                # logger.info('batch loss = %f'%(batch_loss))
+                # logger.debug('test: time elapsed: %.3fs.'%(time.time()-start_time))
+        except KeyboardInterrupt:
+            print("get keyboard interrupt")
 
 

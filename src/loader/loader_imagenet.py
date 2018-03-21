@@ -146,11 +146,21 @@ class loader_imagenet:
 
             logger.info('Factor: {} {}'.format(sc_factor_1, sc_factor_2))
 
-        bbox = random_ann.bbox
-        bbox.x1 = bbox.x1 * sc_factor_1
-        bbox.x2 = bbox.x2 * sc_factor_1
-        bbox.y1 = bbox.y1 * sc_factor_1
-        bbox.y2 = bbox.y2 * sc_factor_1
+            bbox = random_ann.bbox
+            bbox.x1 = random_ann.y1
+            bbox.x2 = random_ann.y2
+            bbox.y1 = random_ann.disp_width - random_ann.x2
+            bbox.y2 = random_ann.disp_width - random_ann.y1
+
+            imageDraw = cv2.rectangle(image, (int(bbox.x1), int(bbox.y1)), (int(bbox.x2), int(bbox.y2)),
+                                      (255, 255, 255), 2)
+            cv2.imwrite(image.split('/')[-1], imageDraw)
+        else:
+            bbox = random_ann.bbox
+            bbox.x1 = bbox.x1 * sc_factor_1
+            bbox.x2 = bbox.x2 * sc_factor_1
+            bbox.y1 = bbox.y1 * sc_factor_1
+            bbox.y2 = bbox.y2 * sc_factor_1
 
         return image, bbox
 

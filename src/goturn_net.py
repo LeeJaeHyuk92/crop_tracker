@@ -17,19 +17,21 @@ def LeakyReLU(x, alpha=0.1, name="lrelu"):
 
 class TRACKNET: 
     def __init__(self, batch_size, train = True):
-        self.parameters = {}
+
         self.batch_size = batch_size
         self.target = tf.placeholder(tf.float32, [None, 227, 227, 3])
         self.image = tf.placeholder(tf.float32, [None, 227, 227, 3])
-        self.bbox = tf.placeholder(tf.float32, [None, 4])
-        self.confs = tf.placeholder(tf.float32, [None, POLICY['side'] * POLICY['side'], POLICY['num']])
-        self.coord = tf.placeholder(tf.float32, [None, POLICY['side'] * POLICY['side'], POLICY['num'], 4])
-        self.upleft = tf.placeholder(tf.float32, [None, POLICY['side'] * POLICY['side'], POLICY['num'], 2])
-        self.botright = tf.placeholder(tf.float32, [None, POLICY['side'] * POLICY['side'], POLICY['num'], 2])
-        self.areas = tf.placeholder(tf.float32, [None, POLICY['side'] * POLICY['side'], POLICY['num']])
+        self.parameters = {}
         self.outdim = POLICY['side'] * POLICY['side'] * POLICY['num'] * 5
         self.train = train
         self.wd = 0.0005
+        if train:
+            self.bbox = tf.placeholder(tf.float32, [None, 4])
+            self.confs = tf.placeholder(tf.float32, [None, POLICY['side'] * POLICY['side'], POLICY['num']])
+            self.coord = tf.placeholder(tf.float32, [None, POLICY['side'] * POLICY['side'], POLICY['num'], 4])
+            self.upleft = tf.placeholder(tf.float32, [None, POLICY['side'] * POLICY['side'], POLICY['num'], 2])
+            self.botright = tf.placeholder(tf.float32, [None, POLICY['side'] * POLICY['side'], POLICY['num'], 2])
+            self.areas = tf.placeholder(tf.float32, [None, POLICY['side'] * POLICY['side'], POLICY['num']])
     def build(self):
         ########### for target ###########
         # [filter_height, filter_width, in_channels, out_channels]
@@ -148,11 +150,13 @@ class TRACKNET:
         tf.summary.image("objectness", self.net_grid[:, :, :, 4:], max_outputs=2)
 
         self.print_shapes()
-        self.loss = self.loss_grid(self.fc4, POLICY, name="loss")
-        # self.loss = self._loss_layer(self.fc4, self.bbox ,name = "loss")
 
-        l2_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES), name='l2_weight_loss')
-        self.loss_wdecay = self.loss + l2_loss
+        if (self.train):
+            self.loss = self.loss_grid(self.fc4, POLICY, name="loss")
+            # self.loss = self._loss_layer(self.fc4, self.bbox ,name = "loss")
+
+            l2_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES), name='l2_weight_loss')
+            self.loss_wdecay = self.loss + l2_loss
 
     def _loss_layer(self, bottom, label, name = None):
         diff = tf.subtract(self.fc4, self.bbox)
