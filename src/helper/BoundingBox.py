@@ -315,8 +315,8 @@ def calculate_box(net_out):
     adjusted_net_out = np.concatenate([adjusted_coords_xy, adjusted_coords_wh, adjusted_c], 3)
 
     # find max objscore box TODO, if you need NMS, add it
-    top_obj_indexs = np.where(adjusted_net_out[..., 4] == np.max(adjusted_net_out[..., 4]))
-    # top_obj_indexs = np.where(adjusted_net_out[..., 4] > POLICY['thresh'])
+    # top_obj_indexs = np.where(adjusted_net_out[..., 4] == np.max(adjusted_net_out[..., 4]))
+    top_obj_indexs = np.where(adjusted_net_out[..., 4] > POLICY['thresh'])
     objectness_s = adjusted_net_out[top_obj_indexs][..., 4]
 
     pred_box=[]
@@ -334,6 +334,9 @@ def calculate_box(net_out):
         pred_yr = pred_cy + pred_h / 2
 
         pred_box.append([pred_xl, pred_yl, pred_xr, pred_yr, pred_obj])
+
+    pred_box = non_max_suppression_fast(pred_box, POLICY['thresh_IOU'])
+    # type float
     return pred_box
 
         # if objectness > POLICY['thresh']:
