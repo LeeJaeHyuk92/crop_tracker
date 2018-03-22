@@ -116,15 +116,17 @@ def videos_prediction(videos, tracknet, sess, ckpt):
                                               (255, 255, 255), 2)
 
                 bbox = bbox_estim.track(sMatImage, tracknet, sess)
-            if opencv_version == '2':
-                cv2.rectangle(sMatImageDraw, (int(bbox.x1), int(bbox.y1)), (int(bbox.x2), int(bbox.y2)), (255, 0, 0), 2)
-            else:
-                sMatImageDraw = cv2.rectangle(sMatImageDraw, (int(bbox.x1), int(bbox.y1)), (int(bbox.x2), int(bbox.y2)),
-                                              (255, 0, 0), 2)
 
-            cv2.imwrite('./result/'+ str(ckpt.split('-')[-1]) + "_" + frame.split('/')[-2] + "_" + frame.split('/')[-1], sMatImageDraw)
-            # cv2.imshow('Results', sMatImageDraw)
-            # cv2.waitKey(10)
+            if not bbox == False:
+                if opencv_version == '2':
+                    cv2.rectangle(sMatImageDraw, (int(bbox.x1), int(bbox.y1)), (int(bbox.x2), int(bbox.y2)), (255, 0, 0), 2)
+                else:
+                    sMatImageDraw = cv2.rectangle(sMatImageDraw, (int(bbox.x1), int(bbox.y1)), (int(bbox.x2), int(bbox.y2)),
+                                                  (255, 0, 0), 2)
+
+                cv2.imwrite('./result/'+ str(ckpt.split('-')[-1]) + "_" + frame.split('/')[-2] + "_" + frame.split('/')[-1], sMatImageDraw)
+                # cv2.imshow('Results', sMatImageDraw)
+                # cv2.waitKey(10)
 
 
 if __name__ == "__main__":
@@ -159,15 +161,17 @@ if __name__ == "__main__":
 
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)
-    all_ckpt = all_checkpoint(ckpt_dir)
-    # ckpt = tf.train.get_checkpoint_state(ckpt_dir)
-    # if ckpt and ckpt.model_checkpoint_path:
-    #     saver = tf.train.Saver()
-    #     saver.restore(sess, ckpt.model_checkpoint_path)
-    for ckpt in all_ckpt:
+    ckpt = tf.train.get_checkpoint_state(ckpt_dir)
+    if ckpt and ckpt.model_checkpoint_path:
         saver = tf.train.Saver()
-        saver.restore(sess, ckpt)
-        print(str(ckpt) + " is restored")
+        saver.restore(sess, ckpt.model_checkpoint_path)
+        ckpt = ckpt.model_checkpoint_path
+
+    # all_ckpt = all_checkpoint(ckpt_dir)
+    # for ckpt in all_ckpt:
+    #     saver = tf.train.Saver()
+    #     saver.restore(sess, ckpt)
+    # print(str(ckpt) + " is restored")
         try:
             # for i in range(0, int(len(train_box)/BATCH_SIZE)):
                 # cur_batch = sess.run(batch_queue)

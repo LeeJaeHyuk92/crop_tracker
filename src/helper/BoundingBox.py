@@ -336,7 +336,7 @@ def calculate_box(net_out):
         pred_box.append([pred_xl, pred_yl, pred_xr, pred_yr, pred_obj])
 
     pred_box = non_max_suppression_fast(pred_box, POLICY['thresh_IOU'])
-    # type float
+    # type float, array
     return pred_box
 
         # if objectness > POLICY['thresh']:

@@ -69,14 +69,17 @@ class bbox_estimator:
                                                   tracknet.target: target_pad_expdim})
         bbox_estimate = calculate_box(fc4)
         # this box is NMS result, TODO, all bbox check
-        bbox_estimate = BoundingBox(bbox_estimate[0][0], bbox_estimate[0][1], bbox_estimate[0][2], bbox_estimate[0][3])
+        if not len(bbox_estimate) == 0:
+            bbox_estimate = BoundingBox(bbox_estimate[0][0], bbox_estimate[0][1], bbox_estimate[0][2], bbox_estimate[0][3])
 
-        # Inplace correction of bounding box
-        bbox_estimate.unscale(cur_search_region)
-        bbox_estimate.uncenter(image_curr, search_location, edge_spacing_x, edge_spacing_y)
+            # Inplace correction of bounding box
+            bbox_estimate.unscale(cur_search_region)
+            bbox_estimate.uncenter(image_curr, search_location, edge_spacing_x, edge_spacing_y)
 
-        self.image_prev = image_curr
-        self.bbox_prev_tight = bbox_estimate
-        self.bbox_curr_prior_tight = bbox_estimate
+            self.image_prev = image_curr
+            self.bbox_prev_tight = bbox_estimate
+            self.bbox_curr_prior_tight = bbox_estimate
+        else:
+            bbox_estimate = False
 
         return bbox_estimate

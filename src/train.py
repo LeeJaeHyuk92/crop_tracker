@@ -38,9 +38,9 @@ def train_image(image_loader, images):
     list_annotations = images[curr_image]
     curr_ann = np.random.randint(0, len(list_annotations))
 
-    image, bbox = image_loader.load_annotation(curr_image, curr_ann)
+    image, bbox, error = image_loader.load_annotation(curr_image, curr_ann)
 
-    return image, bbox
+    return image, bbox, error
     # tracker_trainer.train(image, image, bbox, bbox)
 
 
@@ -106,6 +106,7 @@ def data_reader(objLoaderImgNet, train_imagenet_images, train_alov_videos):
     # train_alov_videos = objLoaderAlov.get_videos()
 
     # create example generator and setup the network
+    ep_assign = False           # expansion assign
     for idx in xrange(BATCH_SIZE):
         objExampleGen = example_generator(float(POLICY['lamda_shift']), float(POLICY['lamda_scale']),
                                           float(POLICY['min_scale']), float(POLICY['max_scale']), logger)
@@ -116,11 +117,14 @@ def data_reader(objLoaderImgNet, train_imagenet_images, train_alov_videos):
 
         random_bool = np.random.randint(0, 2)
         if random_bool == 0:
-            image, bbox = train_image(objLoaderImgNet, train_imagenet_images)
-            objExampleGen.reset(bbox, bbox, image, image)
-            # Generate more number of examples
-            images, targets, bbox_gt_scaleds = objExampleGen.make_training_examples(
-                kGeneratedExamplesPerImage, images, targets, bbox_gt_scaleds)
+            image, bbox, error = train_image(objLoaderImgNet, train_imagenet_images)
+            if not error:
+                objExampleGen.reset(bbox, bbox, image, image)
+                # Generate more number of examples
+                images, targets, bbox_gt_scaleds = objExampleGen.make_training_examples(
+                    kGeneratedExamplesPerImage, images, targets, bbox_gt_scaleds)
+            else:
+                continue
         else:
             img_prev, img_curr, bbox_prev, bbox_curr = train_video(train_alov_videos)
             objExampleGen.reset(bbox_prev, bbox_curr, img_prev, img_curr)
@@ -141,7 +145,7 @@ def data_reader(objLoaderImgNet, train_imagenet_images, train_alov_videos):
         # box_tensor = input_queue[2]
         box_tensor = np.array([bbox_gt_scaleds[0].x1, bbox_gt_scaleds[0].y1, bbox_gt_scaleds[0].x2, bbox_gt_scaleds[0].y2], dtype=np.float32)
 
-        if not idx == 0:
+        if ep_assign:
             ep_search_tensor = np.concatenate([ep_search_tensor, np.expand_dims(search_tensor, axis=0)], axis=0)
             ep_target_tensor = np.concatenate([ep_target_tensor, np.expand_dims(target_tensor, axis=0)], axis=0)
             ep_box_tensor = np.concatenate([ep_box_tensor, np.expand_dims(box_tensor, axis=0)], axis=0)
@@ -149,6 +153,7 @@ def data_reader(objLoaderImgNet, train_imagenet_images, train_alov_videos):
             ep_search_tensor = np.expand_dims(search_tensor, axis=0)
             ep_target_tensor = np.expand_dims(target_tensor, axis=0)
             ep_box_tensor = np.expand_dims(box_tensor, axis=0)
+            ep_assign = True
 
     if DEBUG:
         idx = 0
