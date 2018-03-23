@@ -139,9 +139,9 @@ def data_reader(objLoaderImgNet, train_imagenet_images, train_alov_videos):
         # example_generator.reset(bbox_prev, bbox_curr, img_prev, img_curr)
 
         search_tensor = images[0].astype(np.float32)
-        search_tensor = cv2.resize(search_tensor, (HEIGHT, WIDTH), interpolation=cv2.INTER_LINEAR)
+        search_tensor = cv2.resize(search_tensor, (HEIGHT, WIDTH), interpolation=cv2.INTER_CUBIC)
         target_tensor = targets[0].astype(np.float32)
-        target_tensor = cv2.resize(target_tensor, (HEIGHT, WIDTH), interpolation=cv2.INTER_LINEAR)
+        target_tensor = cv2.resize(target_tensor, (HEIGHT, WIDTH), interpolation=cv2.INTER_CUBIC)
         # box_tensor = input_queue[2]
         box_tensor = np.array([bbox_gt_scaleds[0].x1, bbox_gt_scaleds[0].y1, bbox_gt_scaleds[0].x2, bbox_gt_scaleds[0].y2], dtype=np.float32)
 

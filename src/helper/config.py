@@ -19,7 +19,7 @@ POLICY = {
     'decay': 0.0005,
     'max_iter': 600000,
 
-    'NUM_EPOCHS': 100000,
+    'NUM_EPOCHS': 120,
     'BATCH_SIZE': 16,
     'WIDTH': 227,
     'HEIGHT': 227,

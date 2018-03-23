@@ -43,7 +43,7 @@ class bbox_estimator:
 
         image_out = image
         if image_out.shape != (POLICY['HEIGHT'], POLICY['WIDTH'], POLICY['channels']):
-            image_out = cv2.resize(image_out, (POLICY['WIDTH'], POLICY['HEIGHT']), interpolation=cv2.INTER_LINEAR)
+            image_out = cv2.resize(image_out, (POLICY['WIDTH'], POLICY['HEIGHT']), interpolation=cv2.INTER_CUBIC)
 
         image_out = np.float32(image_out)
         # image_out -= np.array(self.mean)
