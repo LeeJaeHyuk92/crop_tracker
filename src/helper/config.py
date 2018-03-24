@@ -6,7 +6,7 @@ POLICY = {
     'logfile': 'train.log',
     'imagenet': './ILSVRC2014',
     'alov': './ALOV',
-    'vot2015': '/home/jaehyuk/dataset/vot2015_sample',
+    'vot': '/home/jaehyuk/dataset/vot2014',
     'checkpoint': '/home/jaehyuk/server_dir/code/experiment/180321_step/crop_tracker/checkpoints',
     'thresh': .5,
     'thresh_IOU': .5,

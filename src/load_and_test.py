@@ -103,6 +103,8 @@ def videos_prediction(videos, tracknet, sess, ckpt):
         bbox_0 = annot_frames[0]
         sMatImage = cv2.imread(frame_0)
         bbox_estim.init(sMatImage, bbox_0)
+        start_time = time.time()
+
         for i in xrange(1, num_frames):
             frame = video_frames[i]
             sMatImage = cv2.imread(frame)
@@ -128,7 +130,8 @@ def videos_prediction(videos, tracknet, sess, ckpt):
                 cv2.imwrite('./result/'+ str(ckpt.split('-')[-1]) + "_" + frame.split('/')[-2] + "_" + frame.split('/')[-1], sMatImageDraw)
                 # cv2.imshow('Results', sMatImageDraw)
                 # cv2.waitKey(10)
-
+        logger.debug(frame_0)
+        logger.debug('test: time elapsed: %.3f fps.' % (1/((time.time() - start_time)/num_frames)))
 
 if __name__ == "__main__":
     if (os.path.isfile(logfile)):
@@ -164,6 +167,7 @@ if __name__ == "__main__":
         saver = tf.train.Saver()
         saver.restore(sess, ckpt.model_checkpoint_path)
         ckpt = ckpt.model_checkpoint_path
+        logger.info(str(ckpt) + " is restored")
 
     # all_ckpt = all_checkpoint(ckpt_dir)
     # for ckpt in all_ckpt:
@@ -177,7 +181,7 @@ if __name__ == "__main__":
                 # import cv2
                 # cv2.imwrite(str(i) + '_test' + 'image.jpg', cur_batch[1][0,...].astype(np.uint8))
 
-            objLoaderVot = loader_vot(POLICY['vot2015'], logger)
+            objLoaderVot = loader_vot(POLICY['vot'], logger)
             videos = objLoaderVot.get_videos()
             videos_prediction(videos, tracknet, sess, ckpt)
 
