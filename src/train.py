@@ -276,7 +276,7 @@ if __name__ == "__main__":
 
     assign_op = global_step.assign(start)
     sess.run(assign_op)
-    model_saver = tf.train.Saver(max_to_keep=10)
+    model_saver = tf.train.Saver(max_to_keep=30)
     try:
         for i in range(start, int((total_image_size) / BATCH_SIZE * NUM_EPOCHS)):
             if i % int((total_image_size) / BATCH_SIZE) == 0:

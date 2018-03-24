@@ -17,6 +17,7 @@ NUM_EPOCHS = 500
 BATCH_SIZE = 1
 WIDTH = 227
 HEIGHT = 227
+ckpt_dir = POLICY['checkpoint']
 
 logger = setup_logger(logfile=None)
 logfile = "test.log"
@@ -155,9 +156,6 @@ if __name__ == "__main__":
     coord = tf.train.Coordinator()
     # start the threads
     tf.train.start_queue_runners(sess=sess, coord=coord)
-
-    ckpt_dir = "./checkpoints"
-
 
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)

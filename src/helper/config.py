@@ -7,6 +7,14 @@ POLICY = {
     'imagenet': './ILSVRC2014',
     'alov': './ALOV',
     'vot2015': '/home/jaehyuk/dataset/vot2015_sample',
+    'checkpoint': '/home/jaehyuk/server_dir/code/experiment/180321_step/crop_tracker/checkpoints',
+    'thresh': .5,
+    'thresh_IOU': .5,
+    'num': 1,
+    'anchors': [3.5, 3.5], #, 3.0, 4.0, 4.0, 3.0, 3, 3, 4, 4],
+    'pretrained_model': '/datahdd/workdir/jaehyuk/dataset/pretrained/GOTURN/checkpoints/checkpoint.ckpt-1',
+
+    # train
     'lamda_shift': 5.,
     'lamda_scale': 15.,
     'min_scale': -0.4,
@@ -40,11 +48,6 @@ POLICY = {
     'noobject_scale': 1,
     'class_scale': 1,
     'coord_scale': 1,
-    'thresh':  .5,
-    'thresh_IOU': .5,
-    'num': 1,
-    'anchors': [3.5, 3.5],
-    'pretrained_model' : '/datahdd/workdir/jaehyuk/dataset/pretrained/GOTURN/checkpoints/checkpoint.ckpt-1',
     'PATHS': {
         'train': './data/tfrecords/train_1_adj.tfrecords',
         'validate': './data/tfrecords/tfc_val.tfrecords',
