@@ -70,10 +70,10 @@ def data_reader(input_queue):
 
     search_tensor = tf.to_float(tf.image.decode_jpeg(search_img, channels = 3))
     search_tensor = tf.image.resize_images(search_tensor,[HEIGHT,WIDTH],
-                            method=tf.image.ResizeMethod.BILINEAR)
+                            method=tf.image.ResizeMethod.CUBIC)
     target_tensor = tf.to_float(tf.image.decode_jpeg(target_img, channels = 3))
     target_tensor = tf.image.resize_images(target_tensor,[HEIGHT,WIDTH],
-                            method=tf.image.ResizeMethod.BILINEAR)
+                            method=tf.image.ResizeMethod.CUBIC)
     box_tensor = input_queue[2]
     return [search_tensor, target_tensor, box_tensor]
 
@@ -162,18 +162,21 @@ if __name__ == "__main__":
 
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)
-    ckpt = tf.train.get_checkpoint_state(ckpt_dir)
-    if ckpt and ckpt.model_checkpoint_path:
+
+    ###
+    # ckpt = tf.train.get_checkpoint_state(ckpt_dir)
+    # if ckpt and ckpt.model_checkpoint_path:
+    #     saver = tf.train.Saver()
+    #     saver.restore(sess, ckpt.model_checkpoint_path)
+    #     ckpt = ckpt.model_checkpoint_path
+    #     logger.info(str(ckpt) + " is restored")
+
+    all_ckpt = all_checkpoint(ckpt_dir)
+    for ckpt in all_ckpt:
         saver = tf.train.Saver()
-        saver.restore(sess, ckpt.model_checkpoint_path)
-        ckpt = ckpt.model_checkpoint_path
+        saver.restore(sess, ckpt)
         logger.info(str(ckpt) + " is restored")
 
-    # all_ckpt = all_checkpoint(ckpt_dir)
-    # for ckpt in all_ckpt:
-    #     saver = tf.train.Saver()
-    #     saver.restore(sess, ckpt)
-    # print(str(ckpt) + " is restored")
         try:
             # for i in range(0, int(len(train_box)/BATCH_SIZE)):
                 # cur_batch = sess.run(batch_queue)

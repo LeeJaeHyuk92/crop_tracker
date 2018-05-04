@@ -7,11 +7,11 @@ POLICY = {
     'imagenet': './ILSVRC2014',
     'alov': './ALOV',
     'vot': '/home/jaehyuk/dataset/vot2014',
-    'checkpoint': '/home/jaehyuk/server_dir/code/experiment/180321_step/crop_tracker/checkpoints',
+    'checkpoint': '/home/jaehyuk/nas_dir/checkpoints/crop_tracker/180323_BICUBIC',
     'thresh': .5,
     'thresh_IOU': .5,
     'num': 1,
-    'anchors': [3.5, 3.5], #, 3.0, 4.0, 4.0, 3.0, 3, 3, 4, 4],
+    'anchors': [3.5, 3.5], # 3.0, 4.0, 4.0, 3.0, 3, 3, 4, 4],
     'pretrained_model': '/datahdd/workdir/jaehyuk/dataset/pretrained/GOTURN/checkpoints/checkpoint.ckpt-1',
 
     # train
