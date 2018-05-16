@@ -4,15 +4,17 @@ DEBUG = False
 
 POLICY = {
     'logfile': 'train.log',
-    'imagenet': './ILSVRC2014',
-    'alov': './ALOV',
+    'imagenet': '/home/jaehyuk/code/experiment/crop_tracker/ILSVRC2014',
+    'alov': '/home/jaehyuk/dataset/ALOV_',
     'vot': '/home/jaehyuk/dataset/vot2014',
-    'checkpoint': '/home/jaehyuk/nas_dir/checkpoints/crop_tracker/180323_BICUBIC',
+    'checkpoint': '/home/jaehyuk/code/experiment/crop_tracker/checkpoints',
     'thresh': .5,
     'thresh_IOU': .5,
     'num': 1,
-    'anchors': [3.5, 3.5], # 3.0, 4.0, 4.0, 3.0, 3, 3, 4, 4],
-    'pretrained_model': '/datahdd/workdir/jaehyuk/dataset/pretrained/GOTURN/checkpoints/checkpoint.ckpt-1',
+    # 'anchors': [3.5, 3.5], # 3.0, 4.0, 4.0, 3.0, 3, 3, 4, 4],
+    'anchors': [0.5, 0.5],
+    # 'pretrained_model': '/datahdd/workdir/jaehyuk/dataset/pretrained/GOTURN/checkpoints/checkpoint.ckpt-1',
+    'pretrained_model': None,
 
     # train
     'lamda_shift': 5.,
@@ -27,12 +29,12 @@ POLICY = {
     'decay': 0.0005,
     'max_iter': 600000,
 
-    'NUM_EPOCHS': 120,
-    'BATCH_SIZE': 16,
-    'WIDTH': 227,
-    'HEIGHT': 227,
+    'NUM_EPOCHS': 10,
+    'BATCH_SIZE': 4,
+    'WIDTH': 224,
+    'HEIGHT': 224,
     'kGeneratedExamplesPerImage': 1,
-    'side': 7,
+    'side': 1,
     'channels': 3,
     'optimizer': dict({
         'rmsprop': tf.train.RMSPropOptimizer,
