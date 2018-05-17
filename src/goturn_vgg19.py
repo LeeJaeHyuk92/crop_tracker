@@ -150,7 +150,7 @@ class TRACKNET:
         if (self.train):
             self.relu7 = tf.nn.dropout(self.relu7, 0.5)
 
-        self.fc8 = self.fc_layer(self.relu7, 4096, 5, "fc8")
+        self.fc8 = self.fc_layer(self.relu7, 4096, POLICY['side'] * POLICY['side'] * POLICY['num'] * 5, "fc8")
 
         # tf.summary.image("objectness", self.net_grid[:, :, :, 4:], max_outputs=2)
 

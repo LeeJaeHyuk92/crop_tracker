@@ -8,7 +8,7 @@ POLICY = {
     'alov': '/home/jaehyuk/dataset/ALOV_vot2014',
     'vot': '/home/jaehyuk/dataset/vot2014_sample',
     'checkpoint': '/home/jaehyuk/code/experiment/crop_tracker/checkpoints',
-    'npy': './src/vgg19.npy',
+    'vgg': './src/vgg19.npy',
     'thresh': .5,
     'thresh_IOU': .5,
     'num': 1,
