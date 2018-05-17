@@ -223,7 +223,7 @@ if __name__ == "__main__":
         alov_images += len(annos)
     total_image_size = len(train_imagenet_images) + alov_images
     logger.info('total training image size is: IMAGENET: ' + str(len(train_imagenet_images)) + ' and ALOV: ' + str(alov_images))
-    tracknet = goturn_vgg19.TRACKNET(BATCH_SIZE, './src/vgg19.npy')
+    tracknet = goturn_vgg19.TRACKNET(BATCH_SIZE, POLICY['vgg'])
     tracknet.build()
 
     global_step = tf.Variable(0, trainable=False, name="global_step")

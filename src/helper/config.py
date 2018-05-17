@@ -4,10 +4,11 @@ DEBUG = False
 
 POLICY = {
     'logfile': 'train.log',
-    'imagenet': '/home/jaehyuk/code/experiment/crop_tracker/ILSVRC2014',
-    'alov': '/home/jaehyuk/dataset/ALOV_',
-    'vot': '/home/jaehyuk/dataset/vot2014',
+    'imagenet': '/home/jaehyuk/dataset/ILSVRC2014',
+    'alov': '/home/jaehyuk/dataset/ALOV_vot2014',
+    'vot': '/home/jaehyuk/dataset/vot2014_sample',
     'checkpoint': '/home/jaehyuk/code/experiment/crop_tracker/checkpoints',
+    'npy': './src/vgg19.npy',
     'thresh': .5,
     'thresh_IOU': .5,
     'num': 1,
@@ -29,8 +30,8 @@ POLICY = {
     'decay': 0.0005,
     'max_iter': 600000,
 
-    'NUM_EPOCHS': 10,
-    'BATCH_SIZE': 4,
+    'NUM_EPOCHS': 120,
+    'BATCH_SIZE': 24,
     'WIDTH': 224,
     'HEIGHT': 224,
     'kGeneratedExamplesPerImage': 1,
@@ -46,7 +47,7 @@ POLICY = {
         'ftrl': tf.train.FtrlOptimizer,
         'sgd': tf.train.GradientDescentOptimizer,}),
 
-    'object_scale': 5,
+    'object_scale': 1,
     'noobject_scale': 1,
     'class_scale': 1,
     'coord_scale': 1,

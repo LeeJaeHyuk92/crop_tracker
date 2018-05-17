@@ -373,7 +373,7 @@ class TRACKNET:
             weight_decay = tf.multiply(tf.nn.l2_loss(filt), 0.0005, name='fc_weight_loss')
             tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, weight_decay)
 
-            _activation_summary(relu)
+            # _activation_summary(relu)
             # relu = tf.Print(relu, [tf.shape(relu)], message='Shape of %s' % name, first_n=1, summarize=4)
             return relu
 
@@ -384,7 +384,7 @@ class TRACKNET:
             conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
             bias = tf.nn.bias_add(conv, conv_biases)
             relu = tf.nn.relu(bias)
-            _activation_summary(relu)
+            # _activation_summary(relu)
             # relu = tf.Print(relu, [tf.shape(relu)], message='Shape of %s' % name, first_n=1, summarize=4)
             return relu
 
@@ -398,7 +398,7 @@ class TRACKNET:
             weight_decay = tf.multiply(tf.nn.l2_loss(weights), 0.0005, name='fc_weight_loss')
             tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, weight_decay)
 
-            _activation_summary(fc)
+            # _activation_summary(fc)
             # fc = tf.Print(fc, [tf.shape(fc)], message='Shape of %s' % name, first_n=1, summarize=4)
             return fc
 
